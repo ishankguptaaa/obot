@@ -1118,6 +1118,14 @@ func (i *Invoker) stream(runCtx context.Context, cancelRun context.CancelCauseFu
 				return runResp.Err()
 			}
 
+			// Guard against select race: when both runCtx.Done() and runEvent are ready,
+			// Go's select picks randomly. Check if the context was cancelled before
+			// processing any events — especially tool confirm events that would
+			// auto-approve tool calls after an abort.
+			if runCtx.Err() != nil {
+				return context.Cause(runCtx)
+			}
+
 			if frame.Run != nil {
 				if frame.Run.Type == gptscript.EventTypeRunStart {
 					prg = &frame.Run.Program
